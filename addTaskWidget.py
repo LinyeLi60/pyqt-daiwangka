@@ -5,11 +5,12 @@ import requests
 import json
 import os
 from PyQt5.QtCore import QThread, pyqtSignal
-
+from threading import Thread
 
 # 添加任务的widget
 class AddTaskWidget(QWidget):
     add_task_signal = pyqtSignal(dict)  # 把任务发出去
+    logging_signal = pyqtSignal(str)  # 用来发日志的信号
     provinceCodeToName = {}
     provinceNameToCode = {}
     cityNameToCode = {}
@@ -78,7 +79,6 @@ class AddTaskWidget(QWidget):
         self.tableWidget.setEditTriggers(QAbstractItemView.NoEditTriggers)  # 禁止编辑
         self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中整行
         self.tableWidget.setSelectionMode(QAbstractItemView.MultiSelection)  # 多行选中
-        self.tableWidget.verticalHeader().setVisible(False)  # 隐藏竖直表头
 
         h_layout = QHBoxLayout()
         h_widget = QWidget()
@@ -117,6 +117,8 @@ class AddTaskWidget(QWidget):
 
         # 绝对不可以一边遍历一边删除，会删不完
         for index in index_list:
+            self.logging_signal.emit(f"删除{self.tableWidget.item(index.row(), 0).text()}-"
+                                     f"{self.tableWidget.item(index.row(), 1).text()}")
             self.tableWidget.removeRow(index.row())
 
     def onClickButtonStart(self):
@@ -137,11 +139,22 @@ class AddTaskWidget(QWidget):
                                        "cityName": cityName,
                                        "provinceName": provinceName})
 
-        QMessageBox.information(self, "提示", f"新添加{rowCount}条任务")
+        self.logging_signal.emit(f"新添加{rowCount}条任务")
+        self.tableWidget.clear()
+        self.tableWidget.setRowCount(0)
 
     # 添加任务按钮
     def onClickButtonAdd(self):
-        # 先获取当前选中的省份名字
+        thread = Thread(target=self.add_task_thread)
+        thread.start()
+
+    def add_task_thread(self):
+        # 先禁用掉这个按钮避免没添加完
+        self.add_task_button.setEnabled(False)
+        self.start_task_button.setEnabled(False)
+        self.start_task_button.setText("正在添加任务...")
+
+        # # 先获取当前选中的省份名字
         provinceNameSelected = self.province_list_combobox.currentText()
         cityNameSelected = self.city_list_combobox.currentText()
         if provinceNameSelected == "全国":
@@ -157,6 +170,13 @@ class AddTaskWidget(QWidget):
                     self.add_task_to_tableWidget(provinceNameSelected, city)
             else:
                 self.add_task_to_tableWidget(provinceNameSelected, cityNameSelected)
+
+        #
+        self.add_task_button.setEnabled(True)
+        self.start_task_button.setEnabled(True)
+        self.start_task_button.setText("开始任务")
+        self.logging_signal.emit("添加任务完成,请删除自己不需要的任务,然后点击[开始任务]按钮")
+
 
     # 将新添加的任务显示到tableWidget上面去
     def add_task_to_tableWidget(self, provinceName, cityName):

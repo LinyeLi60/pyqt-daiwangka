@@ -38,7 +38,7 @@ def classify_num(num, custom_rules=None):
     type_of_card = ['所有号码']
     match_index_dict = {'所有号码': (0, 11), '尾abababab': (3, 11), '顺子': (7, 11),
                         '中ABCDE': (3, 8), '炸弹': (7, 11), '真山': (7, 11), '豹子': (8, 11), '尾aabbcc': (5, 11),
-                        '4拖1': (6, 11), '尾ababab': (5, 11)}
+                        '4拖1': (6, 11), '尾ababab': (5, 11), '尾号ABC': (8, 11), '尾号CBA': (8, 11), '*a*a*a*a': (3, 11)}
 
     if custom_rules is not None:
         for rule in custom_rules:
@@ -49,6 +49,19 @@ def classify_num(num, custom_rules=None):
             "(?:0(?=1)|1(?=2)|2(?=3)|3(?=4)|4(?=5)|5(?=6)|6(?=7)|7(?=8)|8(?=9)){3,}\\d",
             num[-4:]):
         type_of_card.append('顺子')
+
+    if re.search(
+            "(?:0(?=1)|1(?=2)|2(?=3)|3(?=4)|4(?=5)|5(?=6)|6(?=7)|7(?=8)|8(?=9)){2,}\\d",
+            num[-3:]):
+        if int(num[-1]) > int(num[-2]):
+            type_of_card.append('尾号ABC')
+        else:
+            type_of_card.append('尾号CBA')
+
+        if re.search('([\\d])\\1{2}', num[-6:-3]):
+            type_of_card.append('AAABCD')
+            match_index_dict['AAABCD'] = (5, 11)
+
     if re.search(
             "(?:0(?=1)|1(?=2)|2(?=3)|3(?=4)|4(?=5)|5(?=6)|6(?=7)|7(?=8)|8(?=9)){4,}\\d",
             num[3:8]):
@@ -58,25 +71,34 @@ def classify_num(num, custom_rules=None):
         type_of_card.append('炸弹')
     if num[-8: -4] == num[-4:]:
         type_of_card.append('真山')
+
     if re.search('([\\d])\\1{2}', num[-3:]):
         type_of_card.append('豹子')
 
-    ret = re.search(
-            '(?:9(?=8)|8(?=7)|7(?=6)|6(?=5)|5(?=4)|4(?=3)|3(?=2)|2(?=1)|1(?=0)){5,}\\d', num[1:])
-    if ret:
-        type_of_card.append('倒顺')
-        s, e = ret.span()
-        match_index_dict['倒顺'] = (s+1, e+1)
+    elif re.search('([\\d])\\1{2}', num[3:]):
+        type_of_card.append('全段3A(AAA)')
+        match_index_dict['全段3A(AAA)'] = re.search('([\\d])\\1{2}', num).span()
+
+    if re.search('([\\d])\\1{2}', num[-4:-1]):
+        type_of_card.append('尾号3拖1')
+        match_index_dict['尾号3拖1'] = (7, 10)
+
+    # ret = re.search(
+    #         '(?:9(?=8)|8(?=7)|7(?=6)|6(?=5)|5(?=4)|4(?=3)|3(?=2)|2(?=1)|1(?=0)){5,}\\d', num[1:])
+    # if ret:
+    #     type_of_card.append'倒顺')
+    #     s, e = ret.span()a
+    #     match_index_dict['倒顺'] = (s+1, e+1)
 
     if re.search(
             '(?:9(?=8)|8(?=7)|7(?=6)|6(?=5)|5(?=4)|4(?=3)|3(?=2)|2(?=1)|1(?=0)){4,}\\d', num[-5:]):
         type_of_card.append('倒顺')
         match_index_dict['倒顺'] = (6, 11)
 
-    ret = re.search('(\\d)\\1\\1(\\d)\\2\\2', num)  # aaabbb
+    ret = re.search('(\\d)\\1\\1(\\d)\\2\\2', num[3:])  # aaabbb
     if ret:
         type_of_card.append('aaabbb')
-        match_index_dict['aaabbb'] = ret.span()
+        match_index_dict['aaabbb'] = re.search('(\\d)\\1\\1(\\d)\\2\\2', num).span()
 
     if re.search('(\\d)\\1(\\d)\\2(\\d)\\3', num[-6:]):  # aabbcc
         type_of_card.append('尾aabbcc')

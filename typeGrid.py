@@ -1,12 +1,13 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
+import sys
 try:
     from html import escape
 except ImportError:
     from cgi import escape
     
-import sys
+
 
 class HTMLDelegate(QStyledItemDelegate):
     def __init__(self, parent=None):
@@ -70,16 +71,22 @@ class HTMLDelegate(QStyledItemDelegate):
 
 class TypeGridWidget(QWidget):
 
+    buyNumberSender = pyqtSignal(str, str, str)
+    addToCandidateSender = pyqtSignal(str, str, str, str, bool)      # 添加到候选名单
+
     def __init__(self, name, width=300, height=300):
         super().__init__()
-        self.resize(width, height)
+        # self.resize(width, height)
         self.name = name     # 靓号类型
         self.initUI()
         self.initListener()     # 一些点击事件
 
     def initUI(self):
         layout = QVBoxLayout()
-        label = QLabel(self.name)
+        # label = QLabel(self.name)
+        self.checkBoxAddToCandidate = QCheckBox()
+        self.checkBoxAddToCandidate.setText(self.name)
+
         self.tableWidget = QTableWidget()
         self.tableWidget.setColumnCount(3)
         self.tableWidget.setHorizontalHeaderLabels(["号码", "市", "省份"])
@@ -87,13 +94,25 @@ class TypeGridWidget(QWidget):
         self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectRows)  # 选中整行
         self.tableWidget.horizontalHeader().setVisible(False)  # 隐藏水平表头
         self.tableWidget.verticalHeader().setVisible(False)  # 隐藏竖直表头
-        self.tableWidget.setItemDelegate(HTMLDelegate(self.tableWidget))
+        self.tableWidget.setItemDelegate(HTMLDelegate(self.tableWidget))     # 添加颜色用的
+        # 设置右键出现菜单
+        self.tableWidget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tableWidget.customContextMenuRequested.connect(self.showContextMenu)
+
+        # 新建一个菜单栏
+        self.contextMenu = QMenu()
+        self.actionBuy = self.contextMenu.addAction("下单")
+        self.actionBuy.triggered.connect(self.actionBuyHandler)
+        self.actionCopy = self.contextMenu.addAction("复制")
+        self.actionCopy.triggered.connect(self.actionCopyHandler)
+        self.actionAddToCandidate = self.contextMenu.addAction("添加候选")
+        self.actionAddToCandidate.triggered.connect(self.actionAddToCandidateHandler)
 
         # 底部按钮
         bottom_widget = QWidget()
         bottom_layout = QHBoxLayout()
         self.checkBox = QCheckBox()
-        labelHint = QLabel("勾选则不显示")
+        labelHint = QLabel("不显示")
         self.buttonClear = QPushButton("清空")
         bottom_layout.addWidget(self.checkBox)
         bottom_layout.addWidget(labelHint)
@@ -101,10 +120,52 @@ class TypeGridWidget(QWidget):
         bottom_widget.setLayout(bottom_layout)
 
         # 添加所有控件
-        layout.addWidget(label)
+        layout.addWidget(self.checkBoxAddToCandidate)
         layout.addWidget(self.tableWidget)
         layout.addWidget(bottom_widget)
         self.setLayout(layout)
+
+    def showContextMenu(self, position):
+        """
+
+        :param position: 右键点击的位置
+        :return:
+        """
+        # 行数大于0才可以
+        if self.tableWidget.rowCount() > 0:
+            self.contextMenu.move(QCursor().pos())
+            self.contextMenu.show()
+
+    def actionAddToCandidateHandler(self):
+        for i in self.tableWidget.selectionModel().selection().indexes():
+            rowNum = i.row()
+
+        num = self.tableWidget.item(rowNum, 0).text()
+        city = self.tableWidget.item(rowNum, 1).text()
+        province = self.tableWidget.item(rowNum, 2).text()
+        self.addToCandidateSender.emit(num, province, city, self.name, True)
+
+    def actionCopyHandler(self):
+        for i in self.tableWidget.selectionModel().selection().indexes():
+            rowNum = i.row()
+
+        waitToBuyNumber = self.tableWidget.item(rowNum, 0).text()
+        cityName = self.tableWidget.item(rowNum, 1).text()
+        provinceName = self.tableWidget.item(rowNum, 2).text()
+
+        print("复制:", provinceName, cityName, waitToBuyNumber)
+        clipboard = QApplication.clipboard()
+        clipboard.setText(' '.join([provinceName, cityName, waitToBuyNumber]))
+
+    def actionBuyHandler(self):
+        for i in self.tableWidget.selectionModel().selection().indexes():
+            rowNum = i.row()
+
+        waitToBuyNumber = self.tableWidget.item(rowNum, 0).text()
+        cityName = self.tableWidget.item(rowNum, 1).text()
+        provinceName = self.tableWidget.item(rowNum, 2).text()
+        print("待下单:", waitToBuyNumber, provinceName, cityName)
+        self.buyNumberSender.emit(waitToBuyNumber, provinceName, cityName)
 
     def initListener(self):
         self.buttonClear.clicked.connect(self.onClickButtonClear)
@@ -115,6 +176,10 @@ class TypeGridWidget(QWidget):
         self.tableWidget.setRowCount(0)     # 一定要归0
 
     def add_record(self, num, province, city, match_index_dict):
+        # 添加到候选列表
+        if self.checkBoxAddToCandidate.isChecked():
+            self.addToCandidateSender.emit(num, province, city, self.name, False)
+
         # 如果不展示号码
         if self.checkBox.isChecked():
             return
@@ -134,13 +199,16 @@ class TypeGridWidget(QWidget):
         self.tableWidget.setItem(rowCount, 1, QTableWidgetItem(city))
         self.tableWidget.setItem(rowCount, 2, QTableWidgetItem(province))
         self.tableWidget.resizeColumnsToContents()  # 调整列适应内容
-        self.tableWidget.scrollToBottom()
+        if self.contextMenu.isHidden():
+            self.tableWidget.scrollToBottom()
 
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     main = TypeGridWidget("真山")
+    main.add_record("111", "province", "city", {})
+    main.add_record("222", "province", "city", {})
     main.show()
 
     sys.exit(app.exec_())

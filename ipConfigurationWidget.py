@@ -13,6 +13,7 @@ from proxy_utils import validate_url
 
 class IPConfigurationWidget(QWidget):
     ip_url_setter = pyqtSignal(str)  # 把ip代理的链接发出去
+    thread_num_sender = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -32,6 +33,7 @@ class IPConfigurationWidget(QWidget):
         v_layout = QVBoxLayout()
         v_widget = QWidget()
         self.ip_url_edit = QLineEdit("http://www.15daili.com/apiProxy.ashx?un=13777893886&pw=5201314.&count=500")
+        self.buttonSetThread = QPushButton("设置线程数/请在开启脚本之前设置")
         self.buttonValidate = QPushButton("测试IP")
         self.buttonSet = QPushButton("设置当前IP代理进行扫号")
         self.thread_num_edit = QLineEdit("100")      # 线程数量设置
@@ -52,6 +54,7 @@ class IPConfigurationWidget(QWidget):
 
         v_layout.addWidget(h_widget_1)
         v_layout.addWidget(h_widget_2)
+        v_layout.addWidget(self.buttonSetThread)
         v_layout.addWidget(self.buttonValidate)
         v_layout.addWidget(self.buttonSet)
         v_widget.setLayout(v_layout)
@@ -63,6 +66,10 @@ class IPConfigurationWidget(QWidget):
     def initListener(self):
         self.buttonValidate.clicked.connect(self.validate_url_listener)      # 验证并启动ip清洗
         self.buttonSet.clicked.connect(self.set_url)  # 验证并启动ip清洗
+        self.buttonSetThread.clicked.connect(self.set_thread_num)       # 设置线程数量
+
+    def set_thread_num(self):
+        self.thread_num_sender.emit(self.thread_num_edit.text())
 
     def set_url(self):
         # 先验证一下连接是否有效
